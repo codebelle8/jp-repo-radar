@@ -1,0 +1,27 @@
+{
+  "name": "jp-repo-radar",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dashboard of the public GitHub repositories of Japanese web-development companies (Next.js + React).",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "collect": "node scripts/run-job.mjs collect",
+    "discover": "node scripts/run-job.mjs discover",
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16"
+  }
+}

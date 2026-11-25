@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+data/
+.vercel
+*.log
+
+# Secrets: never commit real environment files
+.env
+.env*
+!.env.example
