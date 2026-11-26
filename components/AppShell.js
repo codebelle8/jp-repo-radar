@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useStatus, useT } from "@/components/providers";
 import { ago, localClock } from "@/lib/format";
 import { msg } from "@/lib/i18n";
@@ -14,6 +15,7 @@ const TABS = [
   { href: "/contribute", label: msg("Contribute"), match: (p) => p.startsWith("/contribute") },
   { href: "/discovery", label: msg("Discovery"), match: (p) => p.startsWith("/discovery") },
   { href: "/tracker", label: msg("Tracker"), match: (p) => p.startsWith("/tracker"), private: true },   // only when signed in
+  { href: "/fixes", label: msg("Auto-fix"), match: (p) => p.startsWith("/fixes"), private: true },
   { href: "/settings", label: msg("Settings"), match: (p) => p.startsWith("/settings") },
 ];
 
@@ -90,6 +92,7 @@ export function AppShell({ children }) {
               </Link>
             ))}
           </nav>
+          <NotificationBell />
           <LanguageSwitch />
           <ThemeButton />
         </div>

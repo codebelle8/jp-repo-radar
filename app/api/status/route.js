@@ -1,6 +1,7 @@
 import { onVercel } from "@/lib/auth";
 import { adminState, checkHost, json, route } from "@/lib/http";
 import { getJob, getToken, publicJob, recentRuns } from "@/lib/jobs";
+import { unreadCount } from "@/lib/notifications";
 import { readyStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const GET = route(async (request) => {
     getJob(store), recentRuns(store), store.hgetall("companies"), store.hgetall("orgs"), store.get("rate"),
     store.get("candidateCounts"), store.get("tokenInfo"), getToken(store),
   ]);
+  const admin = adminState(request);
   return json({
     version: "2.0.0",
     onVercel: onVercel(),
@@ -19,7 +21,8 @@ export const GET = route(async (request) => {
     token: { configured: !!token.token, source: token.source, login: tokenInfo?.login || null,
       error: tokenInfo?.error || null, checkedAt: tokenInfo?.checkedAt || null },
     canSaveToken: !store.ephemeral,
-    admin: adminState(request),
+    admin,
+    notifications: admin.ok ? { unread: await unreadCount(store) } : null,
     job: publicJob(job),
     lastCollect: runs.find((r) => r.kind === "collect") || null,
     lastDiscover: runs.find((r) => r.kind === "discover") || null,

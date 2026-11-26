@@ -8,6 +8,7 @@ import { createFileStore } from "../lib/store-file.js";
 export const RATE = { limit: 5000, cost: 1, remaining: 4900, resetAt: "2030-01-01T00:00:00Z" };
 
 function respond(status, payload, headers = {}) {
+  if (status === 204) return new Response(null, { status, headers });
   const body = typeof payload === "string" ? payload : JSON.stringify(payload);
   return new Response(body, { status, headers: { "content-type": "application/json", ...headers } });
 }
@@ -67,9 +68,15 @@ export class FakeGitHub {
     this.viewerData = { login: "tester", pullRequests: { nodes: [] }, issueComments: { nodes: [] } };   // tracker sync
     this.resources = {};               // issue URL (lower case) -> {url, title, state, closedAt}
     this.calls = [];
+    this.restHandlers = [];            // [method, RegExp on the path, (match, body, url) => [status, payload]]
+    this.restCalls = [];               // {method, path, body}
+    this.graphqlHandlers = [];         // [substring of the query, (variables) => data]
     this.rateLimitSeconds = 0; // > 0: next request answers 403 rate limited
     this.fetch = this.fetch.bind(this);
   }
+
+  onRest(method, re, fn) { this.restHandlers.push([method, re, fn]); return this; }
+  onGraphql(marker, fn) { this.graphqlHandlers.push([marker, fn]); return this; }
 
   addOrg(login, repos, info = {}) {
     this.orgs.set(login.toLowerCase(), {
@@ -89,6 +96,8 @@ export class FakeGitHub {
     }
     if (url.endsWith("/graphql")) {
       const { query, variables } = JSON.parse(init.body);
+      const custom = this.graphqlHandlers.find(([marker]) => query.includes(marker));
+      if (custom) return respond(200, { data: { rateLimit: RATE, ...custom[1](variables) } });
       if (query.includes("query TrackerSync")) {
         const data = { rateLimit: RATE, viewer: this.viewerData };
         for (const [k, url] of Object.entries(variables || {})) data[k] = this.resources[url.toLowerCase()] || null;
@@ -102,6 +111,16 @@ export class FakeGitHub {
       }
       if (query.includes("fragment RepoContrib")) return this.contribPage(variables);
       return this.orgPage(variables);
+    }
+    const method = init.method || "GET";
+    const path = new URL(url).pathname;
+    for (const [m, re, fn] of this.restHandlers) {
+      const match = m === method && path.match(re);
+      if (!match) continue;
+      const body = init.body ? JSON.parse(init.body) : undefined;
+      this.restCalls.push({ method, path, body });
+      const [status, payload] = fn(match, body, new URL(url));
+      return respond(status, payload ?? (status >= 400 ? { message: "Not Found" } : {}));
     }
     if (url.includes("/search/users")) {
       const u = new URL(url);
@@ -207,4 +226,61 @@ export async function startFakeUpstash(token = "secret") {
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   return { url: `http://127.0.0.1:${server.address().port}`, token, kv, close: () => new Promise((r) => server.close(r)) };
+}
+
+/** Stand-in for the Anthropic client's Managed Agents surface (agents, environments, sessions, events, files). */
+export class FakeAnthropic {
+  constructor() {
+    this.agents = [];
+    this.created = [];        // session create params
+    this.sent = [];           // {sessionId, events}
+    this.uploads = [];        // {id, name, text}
+    this.sessions = {};       // id -> {status, usage, events: [...asc], files: [{id, filename, content}]}
+    const iter = (items) => ({ data: items, [Symbol.asyncIterator]: async function* () { yield* items; } });
+    const self = this;
+    this.beta = {
+      environments: { create: async (p) => ({ id: "env_1", ...p }) },
+      agents: {
+        create: async (p) => { const a = { id: "agent_1", version: 1, ...p }; self.agents.push(["create", p]); return a; },
+        update: async (id, p) => { self.agents.push(["update", p]); return { id, version: self.agents.length, ...p }; },
+      },
+      files: {
+        upload: async ({ file }) => {
+          const id = `file_${self.uploads.length + 1}`;
+          self.uploads.push({ id, name: file.name, text: await file.text() });
+          return { id, filename: file.name };
+        },
+        list: ({ scope_id }) => iter((self.sessions[scope_id]?.files || []).map((f) => ({ id: f.id, filename: f.filename }))),
+        download: async (id) => {
+          const f = Object.values(self.sessions).flatMap((x) => x.files || []).find((x) => x.id === id);
+          return { text: async () => f.content };
+        },
+      },
+      sessions: {
+        create: async (p) => {
+          const id = `sesn_${self.created.length + 1}`;
+          self.created.push(p);
+          self.sessions[id] = { status: "running", usage: { list_cost: { amount: "0", currency: "USD" } }, events: [], files: [] };
+          return { id, status: "running" };
+        },
+        retrieve: async (id) => ({ id, ...self.sessions[id] }),
+        events: {
+          list: (id, params = {}) => {
+            const events = [...(self.sessions[id]?.events || [])];
+            return iter(params.order === "desc" ? events.reverse() : events);
+          },
+          send: async (sessionId, { events }) => { self.sent.push({ sessionId, events }); return {}; },
+        },
+      },
+    };
+  }
+
+  /** Finish a session: idle after end_turn with a result.json in its outputs. */
+  finish(id, result, { cost = "180", outcome = "satisfied" } = {}) {
+    Object.assign(this.sessions[id], {
+      status: "idle", usage: { list_cost: { amount: cost, currency: "USD" } },
+      events: [{ type: "span.outcome_evaluation_end", result: outcome }, { type: "session.status_idle", stop_reason: { type: "end_turn" } }],
+      files: [{ id: `out_${id}`, filename: "result.json", content: JSON.stringify(result) }],
+    });
+  }
 }

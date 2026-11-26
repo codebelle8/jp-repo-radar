@@ -22,6 +22,7 @@ repositories, and refreshes daily.
 | **Discovery** | Searches GitHub for more Japanese organizations, scores whether each looks like a company (versus a community or a university), and queues them for approval. |
 | **Tracker** (private) | Issues you are working on, moved forward automatically from your GitHub activity (watching → commented → PR open → merged). Your pull requests and application stage per company. A company is flagged *ready to approach* after 2 merged pull requests. |
 | **English / 日本語** | Every page, message and chart label in both languages. Switch with the flags in the header; the choice is remembered per browser, and the first visit follows the browser's language. |
+| **Auto-fix** (private) | Paste an issue link: a Claude Managed Agents session fixes it in your fork, runs the tests and pushes a branch. You review the diff and explanation, then open the pull request with one click. Reviews, comments, CI failures and merges on that pull request arrive as in-app notifications, and the agent can address review comments too. |
 | **Skill match** (private) | Your languages, detected from your GitHub repositories, compared with each company's stack. Suggests companies to contribute to, ranked by skill match and welcome score. |
 
 | Contribute: issues to pick up | Contribute: welcome score per repository |
@@ -172,6 +173,29 @@ totals, so the company page shows trend lines after the second run.
 Most companies keep product code private, so these numbers describe open-source and public activity, not total engineering
 output.
 
+### Auto-fix (private)
+
+1. **Pre-check** (GitHub GraphQL): the issue is open, unassigned, has no open pull request that closes it, and nobody said they
+   are working on it recently. Warnings for missing licenses, macOS-only stacks and contribution rules that mention AI.
+2. **Fork** the repository with your write token (a new branch name per attempt, nothing is overwritten).
+3. **Session** on Claude Managed Agents (`claude-opus-5-5`): the fork is mounted through Anthropic's git proxy, so the token
+   never enters the sandbox; networking is limited to package registries; a hard spending cap per run (`FIX_BUDGET_CENTS`,
+   default 500 = $5). The issue text is mounted as a file and treated as data, not instructions. An outcome rubric makes the
+   agent iterate until the change is tested, minimal and documented; it stops with "blocked" when the project forbids AI
+   contributions or needs a maintainer's decision.
+4. **Result**: the agent writes `result.json` (status, Japanese explanation for you, test output, pull request title and body).
+   The app loads the diff from GitHub's compare API.
+5. **Your approval**: read the explanation and the diff, tick "I can explain this", and create the pull request (`Fixes #N`,
+   one per company per day). Nothing is posted before this step.
+6. **Watching**: reviews, comments, CI status and merges are checked when you open the page (at most every 2 minutes), every
+   15 minutes by `.github/workflows/watch.yml`, and immediately on session events if the Anthropic webhook is configured.
+   Each change becomes an in-app notification (bell in the header). **Respond to review** starts a new session on the same
+   branch and drafts a reply that you post after checking it.
+
+Setup: add `ANTHROPIC_API_KEY` and `GITHUB_WRITE_TOKEN` (classic token, `public_repo` + `workflow`) in Vercel, then press
+**Create agent** on the Auto-fix page. Optional: `ANTHROPIC_WEBHOOK_SIGNING_KEY` (Claude Console -> Manage -> Webhooks ->
+`/api/webhooks/anthropic`) and `CRON_SECRET` + the GitHub Actions variable `APP_URL` for the 15-minute watcher.
+
 ## Command line
 
 ```bash
@@ -190,6 +214,11 @@ npm test                                     # unit tests (GitHub and Upstash fa
 | `CRON_SECRET` | Vercel | Protects `/api/cron/collect` |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | added by Vercel's Upstash integration | Redis storage (`UPSTASH_REDIS_REST_URL` / `_TOKEN` also work); takes priority |
 | `DATABASE_URL` | added by Vercel's Neon integration | Postgres storage (`POSTGRES_URL` also works); tables `jprr_*` are created automatically |
+| `ANTHROPIC_API_KEY` | Vercel (auto-fix) | Claude API key for Managed Agents sessions (billed separately from a Claude subscription) |
+| `GITHUB_WRITE_TOKEN` | Vercel (auto-fix) | Classic token with `public_repo` and `workflow`: forks, pushes the fix branch, opens pull requests and replies |
+| `ANTHROPIC_WEBHOOK_SIGNING_KEY` | optional | Verifies Anthropic webhooks at `/api/webhooks/anthropic` (faster updates) |
+| `FIX_BUDGET_CENTS` | optional | Spending cap per auto-fix session in US cents (default 500) |
+| `FIX_CONSOLE_WORKSPACE` | optional | Claude Console workspace ID for the "watch live" links (default `default`) |
 | `DATA_DIR` | optional | Local data folder (default `./data`) |
 | `STORE_PREFIX` | optional | Redis key prefix (default `jprr:`) |
 
@@ -212,6 +241,8 @@ lib/
   contrib.js            open issues + welcome score per active repository (collection phase 2)
   tracker.js            private tracker: tracked issues, your PRs (GitHub sync), applications
   skills.js             your languages vs. each company's stack (skill match, suggested companies)
+  fixes.js, fix-agent.js  auto-fix: pre-check, fork, Managed Agents sessions, pull requests, review watching
+  notifications.js      in-app notifications
   i18n.js, i18n/        English / Japanese: translate, plural, rich text; Japanese dictionaries
   discovery.js          search + scoring of candidate organizations
   jobs.js               resumable jobs, step lock, stop, run history

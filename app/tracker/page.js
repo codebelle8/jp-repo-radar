@@ -187,7 +187,16 @@ export default function TrackerPage() {
     { key: "prState", label: t("Your PR"), render: (i) => (i.prUrl ? <a href={i.prUrl} target="_blank" rel="noopener noreferrer"><PrState state={i.prState} /></a> : <Dash />) },
     { key: "notes", label: t("Notes"), sortable: false, render: (i) => <InlineText value={i.notes} placeholder={t("Add note")} multiline onSave={(v) => patchItem(i.id, { notes: v })} /> },
     { key: "updatedAt", label: t("Updated"), className: "nowrap", firstDir: "desc", render: (i) => <TimeAgo iso={i.updatedAt} /> },
-    { key: "remove", label: "", sortable: false, render: (i) => <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeIssue(i)} aria-label={t("Stop tracking {title}", { title: i.title })}>{t("Remove")}</button> },
+    {
+      key: "remove", label: "", sortable: false,
+      render: (i) => (
+        <div className="row" style={{ flexWrap: "nowrap", gap: 4 }}>
+          {i.issueState !== "CLOSED" && i.stage !== "merged" && i.stage !== "dropped"
+            ? <Link href={`/fixes?url=${encodeURIComponent(i.url)}`} className="btn btn-sm">{t("Auto-fix")}</Link> : null}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeIssue(i)} aria-label={t("Stop tracking {title}", { title: i.title })}>{t("Remove")}</button>
+        </div>
+      ),
+    },
   ];
   const inPipeline = new Set(data.companies.map((r) => r.id));
   const suggestions = (sk?.suggestions || []).filter((s) => !inPipeline.has(s.id)).slice(0, 10);
