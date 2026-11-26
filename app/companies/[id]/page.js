@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { TrendChart } from "@/components/charts";
 import { CompanyForm } from "@/components/CompanyForm";
 import { DataTable } from "@/components/DataTable";
-import { usePrefs, useStatus, useToast } from "@/components/providers";
+import { usePrefs, useStatus, useT, useToast } from "@/components/providers";
 import { RepoTable } from "@/components/RepoTable";
 import { ArchivedToggle, Avatar, CardHead, Dash, ExtLink, Loading, PageHead, RunButton, Tile } from "@/components/ui";
 import { api, useApi } from "@/lib/client";
@@ -15,6 +15,7 @@ export default function CompanyPage() {
   const { id } = useParams();
   const router = useRouter();
   const toast = useToast();
+  const { t } = useT();
   const { prefs } = usePrefs();
   const { jobVersion, startJob, canEdit } = useStatus();
   const { data: c, error, loading, reload } = useApi(`/api/companies/${id}`, [jobVersion]);
@@ -29,15 +30,15 @@ export default function CompanyPage() {
   }, [c, search, prefs.includeArchived]);
 
   if (error && !c) {
-    return <div className="empty">{error.message} <Link href="/companies">Back to companies</Link></div>;
+    return <div className="empty">{error.message} <Link href="/companies">{t("Back to companies")}</Link></div>;
   }
-  if (!c) return <><PageHead title="Company" /><Loading /></>;
+  if (!c) return <><PageHead title={t("Company")} /><Loading /></>;
 
   async function remove() {
-    if (!confirm(`Delete ${c.name} and all of its collected data? Its GitHub organizations will no longer be tracked.`)) return;
+    if (!confirm(t("Delete {name} and all of its collected data? Its GitHub organizations will no longer be tracked.", { name: c.name }))) return;
     try {
       await api(`/api/companies/${c.id}`, { method: "DELETE" });
-      toast("Company deleted");
+      toast(t("Company deleted"));
       router.push("/companies");
     } catch (err) { toast(err.message, true); }
   }
@@ -45,19 +46,19 @@ export default function CompanyPage() {
   const wa = c.withArchived;
   const firstAvatar = c.orgs.find((o) => o.avatarUrl)?.avatarUrl;
   const orgColumns = [
-    { key: "login", label: "Organization", render: (o) => (
+    { key: "login", label: t("Organization"), render: (o) => (
       <div className="org-cell"><Avatar src={o.avatarUrl} />
         <div><div className="cell-title"><ExtLink href={ghUrl(o.login)}>{o.login}</ExtLink></div>{o.name ? <div className="cell-sub">{o.name}</div> : null}</div>
       </div>) },
-    { key: "description", label: "Description", render: (o) => o.description ? <div className="cell-desc">{o.description}</div> : <Dash /> },
-    { key: "location", label: "Location", render: (o) => o.location || <Dash /> },
-    { key: "websiteUrl", label: "Website", render: (o) => o.websiteUrl ? <ExtLink href={o.websiteUrl} /> : <Dash /> },
-    { key: "isVerified", label: "Verified", render: (o) => o.isVerified ? <span className="status ok">Verified domain</span> : <Dash /> },
-    { key: "repoTotal", label: "Public repos", num: true, title: "Public non-fork repositories reported by GitHub" },
-    { key: "status", label: "Status", render: (o) => o.status === "ok"
+    { key: "description", label: t("Description"), render: (o) => o.description ? <div className="cell-desc">{o.description}</div> : <Dash /> },
+    { key: "location", label: t("Location"), render: (o) => o.location || <Dash /> },
+    { key: "websiteUrl", label: t("Website"), render: (o) => o.websiteUrl ? <ExtLink href={o.websiteUrl} /> : <Dash /> },
+    { key: "isVerified", label: t("Verified"), render: (o) => o.isVerified ? <span className="status ok">{t("Verified domain")}</span> : <Dash /> },
+    { key: "repoTotal", label: t("Public repos"), num: true, title: t("Public non-fork repositories reported by GitHub") },
+    { key: "status", label: t("Status"), render: (o) => o.status === "ok"
       ? <span className="status ok" title={localTime(o.fetchedAt)}>OK · {ago(o.fetchedAt)}</span>
-      : o.status === "pending" ? <span className="status">Not collected</span>
-        : <span className="status bad" title={o.error || ""}>{o.status === "not_found" ? "Not found on GitHub" : "Error"}</span> },
+      : o.status === "pending" ? <span className="status">{t("Not collected")}</span>
+        : <span className="status bad" title={o.error ? t(o.error) : ""}>{o.status === "not_found" ? t("Not found on GitHub") : t("Error")}</span> },
   ];
 
   return (
@@ -65,19 +66,19 @@ export default function CompanyPage() {
       <div className="company-head" style={{ marginBottom: 16 }}>
         {firstAvatar ? <Avatar src={firstAvatar} large /> : null}
         <div className="names">
-          <div className="small"><Link href="/companies">← Companies</Link></div>
+          <div className="small"><Link href="/companies">{t("← Companies")}</Link></div>
           <h1>{c.name}</h1>
           <div className="row muted" style={{ marginTop: 4 }}>
             {c.nameJa ? <span>{c.nameJa}</span> : null}
             {c.segment ? <span className="chip">{c.segment}</span> : null}
             {c.website ? <ExtLink href={c.website} /> : null}
-            <span className="faint small">{c.lastCollected ? `Collected ${ago(c.lastCollected)}` : "Not collected yet"}</span>
+            <span className="faint small">{c.lastCollected ? t("Collected {when}", { when: ago(c.lastCollected) }) : t("Not collected yet")}</span>
           </div>
         </div>
         <div className="row">
-          <button type="button" className="btn" disabled={!canEdit} onClick={() => setEditing((v) => !v)}>Edit</button>
-          <button type="button" className="btn btn-ghost btn-danger" disabled={!canEdit} onClick={remove}>Delete</button>
-          <RunButton onClick={() => startJob("collect", { companyIds: [c.id] })}>Refresh data</RunButton>
+          <button type="button" className="btn" disabled={!canEdit} onClick={() => setEditing((v) => !v)}>{t("Edit")}</button>
+          <button type="button" className="btn btn-ghost btn-danger" disabled={!canEdit} onClick={remove}>{t("Delete")}</button>
+          <RunButton onClick={() => startJob("collect", { companyIds: [c.id] })}>{t("Refresh data")}</RunButton>
         </div>
       </div>
 
@@ -86,31 +87,31 @@ export default function CompanyPage() {
           onSave={async (body) => {
             const { collect, ...patch } = body;
             await api(`/api/companies/${c.id}`, { body: patch, method: "PATCH" });
-            toast("Saved");
+            toast(t("Saved"));
             setEditing(false);
             reload();
           }} />
       ) : null}
 
       <div className="tiles">
-        <Tile label="Repositories" value={fmt(c.repos)} note={wa.repos !== c.repos ? `${fmt(wa.repos)} incl. archived` : "none archived"} />
-        <Tile label="Branches" value={fmt(c.branches)} note={wa.branches !== c.branches ? `${fmt(wa.branches)} incl. archived` : null} />
-        <Tile label="Open issues" value={fmt(c.openIssues)} note={wa.openIssues !== c.openIssues ? `${fmt(wa.openIssues)} incl. archived` : null} />
-        <Tile label="Closed issues" value={fmt(c.closedIssues)} note={`${fmt(c.totalIssues)} total`} />
-        <Tile label="Open pull requests" value={fmt(c.openPrs)} />
-        <Tile label="Stars" value={compact(c.stars)} />
+        <Tile label={t("Repositories")} value={fmt(c.repos)} note={wa.repos !== c.repos ? t("{n} incl. archived", { n: fmt(wa.repos) }) : t("none archived")} />
+        <Tile label={t("Branches")} value={fmt(c.branches)} note={wa.branches !== c.branches ? t("{n} incl. archived", { n: fmt(wa.branches) }) : null} />
+        <Tile label={t("Open issues")} value={fmt(c.openIssues)} note={wa.openIssues !== c.openIssues ? t("{n} incl. archived", { n: fmt(wa.openIssues) }) : null} />
+        <Tile label={t("Closed issues")} value={fmt(c.closedIssues)} note={t("{n} total", { n: fmt(c.totalIssues) })} />
+        <Tile label={t("Open pull requests")} value={fmt(c.openPrs)} />
+        <Tile label={t("Stars")} value={compact(c.stars)} />
       </div>
 
       <section className="card" style={{ marginBottom: 16 }}>
-        <CardHead title="GitHub organizations owned by this company" sub={String(c.orgs.length)} />
+        <CardHead title={t("GitHub organizations owned by this company")} sub={String(c.orgs.length)} />
         <DataTable columns={orgColumns} rows={c.orgs} initialSort={{ key: "login", dir: "asc" }} rowKey={(o) => o.login} />
       </section>
 
       {c.snapshots.length ? (
         <div className="grid-trend" style={{ marginBottom: 16 }}>
-          {[["branches", "Branches"], ["openIssues", "Open issues"], ["repos", "Repositories"]].map(([k, label]) => (
+          {[["branches", t("Branches")], ["openIssues", t("Open issues")], ["repos", t("Repositories")]].map(([k, label]) => (
             <section key={k} className="card">
-              <CardHead title={label} sub="excl. archived" />
+              <CardHead title={label} sub={t("excl. archived")} />
               <TrendChart label={label} points={c.snapshots.map((s) => ({ t: s.t, v: s[k] }))} />
             </section>
           ))}
@@ -118,13 +119,13 @@ export default function CompanyPage() {
       ) : null}
 
       <section className="card">
-        <CardHead title="Repositories"><span className="muted small">{repos.length} repositories</span></CardHead>
+        <CardHead title={t("Repositories")}><span className="muted small">{t("{n} repositories", { n: repos.length })}</span></CardHead>
         <div className="filters">
-          <input type="search" placeholder="Filter repositories" aria-label="Filter repositories" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input type="search" placeholder={t("Filter repositories")} aria-label={t("Filter repositories")} value={search} onChange={(e) => setSearch(e.target.value)} />
           <ArchivedToggle />
         </div>
         <RepoTable rows={repos} initialSort={{ key: "openIssues", dir: "desc" }}
-          empty={c.lastCollected ? "No repositories match." : "Not collected yet."} />
+          empty={c.lastCollected ? t("No repositories match.") : t("Not collected yet.")} />
       </section>
     </div>
   );

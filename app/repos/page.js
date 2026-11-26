@@ -1,7 +1,7 @@
 "use client";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { usePrefs, useStatus } from "@/components/providers";
+import { usePrefs, useStatus, useT } from "@/components/providers";
 import { RepoTable } from "@/components/RepoTable";
 import { ArchivedToggle, CardHead, ErrorNotice, ExportLink, Loading, PageHead, SegmentSelect } from "@/components/ui";
 import { useApi } from "@/lib/client";
@@ -11,6 +11,7 @@ const PAGE = 50;
 
 function ReposView() {
   const params = useSearchParams();
+  const { t } = useT();
   const { prefs, loaded } = usePrefs();
   const { jobVersion } = useStatus();
   const [q, setQ] = useState("");
@@ -21,8 +22,8 @@ function ReposView() {
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {   // debounce the search box
-    const t = setTimeout(() => { setQuery(q.trim()); setOffset(0); }, 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setQuery(q.trim()); setOffset(0); }, 250);
+    return () => clearTimeout(timer);
   }, [q]);
   useEffect(() => { setOffset(0); }, [prefs.includeArchived, prefs.segment]);
 
@@ -31,7 +32,7 @@ function ReposView() {
     segment: prefs.segment, sort: sort.key, dir: sort.dir, limit: PAGE, offset })}` : null;
   const { data, error, loading } = useApi(url, [jobVersion]);
 
-  const head = <PageHead title="Repositories" lede="Every tracked public repository. Sort by any column; filters apply to all pages." />;
+  const head = <PageHead title={t("Repositories")} lede={t("Every tracked public repository. Sort by any column; filters apply to all pages.")} />;
   if (!data || !companies.data) return <>{head}<ErrorNotice error={error || companies.error} />{error ? null : <Loading />}</>;
 
   const from = data.total ? offset + 1 : 0;
@@ -40,13 +41,13 @@ function ReposView() {
     <>
       {head}
       <div className="filters">
-        <input type="search" placeholder="Search name, description, topic" aria-label="Search repositories" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select aria-label="Language" value={language} onChange={(e) => { setLanguage(e.target.value); setOffset(0); }}>
-          <option value="">All languages</option>
+        <input type="search" placeholder={t("Search name, description, topic")} aria-label={t("Search repositories")} value={q} onChange={(e) => setQ(e.target.value)} />
+        <select aria-label={t("Language")} value={language} onChange={(e) => { setLanguage(e.target.value); setOffset(0); }}>
+          <option value="">{t("All languages")}</option>
           {data.languages.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
-        <select aria-label="Company" value={companyId} onChange={(e) => { setCompanyId(e.target.value); setOffset(0); }}>
-          <option value="">All companies</option>
+        <select aria-label={t("Company")} value={companyId} onChange={(e) => { setCompanyId(e.target.value); setOffset(0); }}>
+          <option value="">{t("All companies")}</option>
           {companies.data.rows.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
         </select>
         <SegmentSelect segments={companies.data.segments} />
@@ -55,15 +56,15 @@ function ReposView() {
         <ExportLink kind="repos" />
       </div>
       <section className="card">
-        <CardHead title="Repositories"><span className="muted small">{fmt(data.total)} repositories</span></CardHead>
+        <CardHead title={t("Repositories")}><span className="muted small">{t("{n} repositories", { n: fmt(data.total) })}</span></CardHead>
         <div className={loading ? "refreshing" : undefined}>
-          <RepoTable rows={data.rows} showCompany initialSort={sort} empty="No repositories match these filters."
+          <RepoTable rows={data.rows} showCompany initialSort={sort} empty={t("No repositories match these filters.")}
             onSort={(key, dir) => { setSort({ key, dir }); setOffset(0); }} />
         </div>
         <div className="pager">
-          <span className="muted small">{fmt(from)}–{fmt(to)} of {fmt(data.total)}</span>
-          <button type="button" className="btn btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>← Previous</button>
-          <button type="button" className="btn btn-sm" disabled={to >= data.total} onClick={() => setOffset(offset + PAGE)}>Next →</button>
+          <span className="muted small">{t("{from}–{to} of {total}", { from: fmt(from), to: fmt(to), total: fmt(data.total) })}</span>
+          <button type="button" className="btn btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>{t("← Previous")}</button>
+          <button type="button" className="btn btn-sm" disabled={to >= data.total} onClick={() => setOffset(offset + PAGE)}>{t("Next →")}</button>
         </div>
       </section>
     </>

@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useT } from "@/components/providers";
 import { fmt } from "@/lib/format";
 
 /**
@@ -28,7 +29,8 @@ export function SortTh({ sortKey, label, sort, onSort, num = false, firstDir, ti
  * columns: [{ key, label, num?, sortable?, firstDir?, sortValue?(row), render?(row), className?, title? }]
  * Pass `onSort(key, dir)` to sort on the server instead (rows are then shown as given).
  */
-export function DataTable({ columns, rows, initialSort = null, onRowClick, empty = "Nothing to show yet.", onSort, rowKey }) {
+export function DataTable({ columns, rows, initialSort = null, onRowClick, empty, onSort, rowKey }) {
+  const { t } = useT();
   const [sort, setSort] = useState(initialSort);
 
   const sorted = useMemo(() => {
@@ -63,7 +65,7 @@ export function DataTable({ columns, rows, initialSort = null, onRowClick, empty
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colSpan={columns.length} className="empty">{empty}</td></tr>
+            <tr><td colSpan={columns.length} className="empty">{empty ?? t("Nothing to show yet.")}</td></tr>
           ) : sorted.map((row, i) => (
             <tr key={rowKey ? rowKey(row) : i} className={onRowClick ? "clickable" : undefined}
               onClick={onRowClick ? (e) => { if (!e.target.closest("a, button, input, select, label")) onRowClick(row); } : undefined}>

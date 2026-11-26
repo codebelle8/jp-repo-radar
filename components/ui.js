@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePrefs, useStatus } from "@/components/providers";
+import { usePrefs, useStatus, useT } from "@/components/providers";
 import { ago, ghUrl, hostOf, localTime, qs, safeUrl } from "@/lib/format";
 
 export function PageHead({ title, lede, children }) {
@@ -42,6 +42,7 @@ export function ExtLink({ href, children }) {
 }
 
 export function TimeAgo({ iso }) {
+  useT();   // re-render when the language changes (ago() and localTime() use the current language)
   return <span title={localTime(iso) || undefined} className={iso ? undefined : "faint"}>{ago(iso)}</span>;
 }
 
@@ -58,10 +59,11 @@ export function Avatar({ src, large = false }) {
 }
 
 export function OrgChips({ orgs }) {
+  const { t } = useT();
   return orgs.map((o) => {
     const bad = o.status === "error" || o.status === "not_found";
-    const title = o.status === "not_found" ? "Not found on GitHub" : o.status === "error" ? `Error: ${o.error || ""}`
-      : o.status === "pending" ? "Not collected yet" : o.name || o.login;
+    const title = o.status === "not_found" ? t("Not found on GitHub") : o.status === "error" ? t("Error: {error}", { error: t(o.error || "") })
+      : o.status === "pending" ? t("Not collected yet") : o.name || o.login;
     return (
       <a key={o.login} className={`chip${bad ? " chip-minus" : ""}`} href={ghUrl(o.login)} target="_blank"
         rel="noopener noreferrer" title={title}>{o.login}</a>
@@ -71,10 +73,11 @@ export function OrgChips({ orgs }) {
 
 export function SegmentSelect({ segments }) {
   const { prefs, setPrefs } = usePrefs();
+  const { t } = useT();
   const value = segments.includes(prefs.segment) ? prefs.segment : "";
   return (
-    <select aria-label="Segment" value={value} onChange={(e) => setPrefs({ segment: e.target.value })}>
-      <option value="">All segments</option>
+    <select aria-label={t("Segment")} value={value} onChange={(e) => setPrefs({ segment: e.target.value })}>
+      <option value="">{t("All segments")}</option>
       {segments.map((s) => <option key={s} value={s}>{s}</option>)}
     </select>
   );
@@ -82,18 +85,20 @@ export function SegmentSelect({ segments }) {
 
 export function ArchivedToggle() {
   const { prefs, setPrefs } = usePrefs();
+  const { t } = useT();
   return (
-    <label className="check" title="Archived repositories are read-only; their issues are frozen.">
+    <label className="check" title={t("Archived repositories are read-only; their issues are frozen.")}>
       <input type="checkbox" checked={prefs.includeArchived} onChange={(e) => setPrefs({ includeArchived: e.target.checked })} />
-      Include archived repos
+      {t("Include archived repos")}
     </label>
   );
 }
 
-export function ExportLink({ kind, label = "Export CSV", all = false }) {
+export function ExportLink({ kind, label, all = false }) {
   const { prefs } = usePrefs();
+  const { t } = useT();
   const href = `/api/export/${kind}?${qs(all ? { includeArchived: 1 } : { includeArchived: prefs.includeArchived ? 1 : 0, segment: prefs.segment })}`;
-  return <a className="btn" href={href} download>{label}</a>;
+  return <a className="btn" href={href} download>{label ?? t("Export CSV")}</a>;
 }
 
 /** A button that needs a GitHub token, admin rights and no running job. */
@@ -107,19 +112,24 @@ export function RunButton({ children, onClick, primary = true, small = false }) 
 
 export function SetupNotice() {
   const { status } = useStatus();
+  const { t, rich } = useT();
   if (!status) return null;
   if (status.token.configured) return null;
+  const settingsLink = (c) => <Link href="/settings">{c}</Link>;
   return (
     <div className="notice">
       <div>
-        <h2>Connect GitHub to start collecting</h2>
+        <h2>{t("Connect GitHub to start collecting")}</h2>
         <ol className="steps">
-          <li>Create a token: <ExtLink href="https://github.com/settings/personal-access-tokens/new">github.com/settings/personal-access-tokens/new</ExtLink>{" "}
-            — choose “Public repositories (read-only)”. No extra permissions are needed.</li>
+          <li>{rich("Create a token: {link} — choose “Public repositories (read-only)”. No extra permissions are needed.", {
+            link: <ExtLink href="https://github.com/settings/personal-access-tokens/new">github.com/settings/personal-access-tokens/new</ExtLink>,
+          })}</li>
           {status.canSaveToken
-            ? <li>Paste it on the <Link href="/settings">Settings</Link> page{status.admin.required && !status.admin.ok ? " (sign in there first)" : ""}.</li>
-            : <li>Add it as <code>GITHUB_TOKEN</code> in Vercel → Project Settings → Environment Variables, then redeploy.</li>}
-          <li>Click “Collect data”. The first run over the starter list takes a few minutes.</li>
+            ? <li>{status.admin.required && !status.admin.ok
+              ? rich("Paste it on the <link>Settings</link> page (sign in there first).", { link: settingsLink })
+              : rich("Paste it on the <link>Settings</link> page.", { link: settingsLink })}</li>
+            : <li>{rich("Add it as {name} in Vercel → Project Settings → Environment Variables, then redeploy.", { name: <code>GITHUB_TOKEN</code> })}</li>}
+          <li>{t("Click “Collect data”. The first run over the starter list takes a few minutes.")}</li>
         </ol>
       </div>
     </div>
@@ -127,12 +137,16 @@ export function SetupNotice() {
 }
 
 export function ErrorNotice({ error }) {
+  const { t } = useT();
   if (!error) return null;
   return (
     <div className="notice warn">
-      <div><h2>Something went wrong</h2><p>{error.message || String(error)}</p></div>
+      <div><h2>{t("Something went wrong")}</h2><p>{t(error.message || String(error))}</p></div>
     </div>
   );
 }
 
-export const Loading = () => <div className="empty">Loading…</div>;
+export const Loading = () => {
+  const { t } = useT();
+  return <div className="empty">{t("Loading…")}</div>;
+};

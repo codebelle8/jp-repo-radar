@@ -21,6 +21,7 @@ repositories, and refreshes daily.
 | **Contribute** | Open issues a newcomer could pick up (unassigned, no linked pull request, recently active), and a 0–100 **welcome score** per repository based on what it actually did in the last 12 months: outside pull requests merged, number of outside contributors, how often and how fast maintainers reply to outside issues, CONTRIBUTING guide, license, beginner labels. |
 | **Discovery** | Searches GitHub for more Japanese organizations, scores whether each looks like a company (versus a community or a university), and queues them for approval. |
 | **Tracker** (private) | Issues you are working on, moved forward automatically from your GitHub activity (watching → commented → PR open → merged). Your pull requests and application stage per company. A company is flagged *ready to approach* after 2 merged pull requests. |
+| **English / 日本語** | Every page, message and chart label in both languages. Switch with the flags in the header; the choice is remembered per browser, and the first visit follows the browser's language. |
 | **Skill match** (private) | Your languages, detected from your GitHub repositories, compared with each company's stack. Suggests companies to contribute to, ranked by skill match and welcome score. |
 
 | Contribute: issues to pick up | Contribute: welcome score per repository |
@@ -55,6 +56,9 @@ flowchart LR
   click.
 - **Private by default where it matters.** Public pages are read-only. Writes need same-origin JSON requests and a signed
   HttpOnly cookie. Tracker and skill endpoints answer 401 to visitors. The GitHub token never reaches the browser.
+- **Translation without a library.** English text is the key and Japanese lives in `lib/i18n/`; server messages with values
+  inside (job progress, score signals, errors) are matched by anchored patterns. A test fails if any string a page passes to
+  `t()` has no Japanese entry, or if a translation drops a placeholder.
 - **Tested without the network.** `npm test` runs a fake GitHub (fetch-compatible, including errors, 502s and rate limits),
   a fake Upstash server and real Postgres semantics through PGlite. CI runs the tests and a production build on every
   push.
@@ -208,6 +212,7 @@ lib/
   contrib.js            open issues + welcome score per active repository (collection phase 2)
   tracker.js            private tracker: tracked issues, your PRs (GitHub sync), applications
   skills.js             your languages vs. each company's stack (skill match, suggested companies)
+  i18n.js, i18n/        English / Japanese: translate, plural, rich text; Japanese dictionaries
   discovery.js          search + scoring of candidate organizations
   jobs.js               resumable jobs, step lock, stop, run history
   queries.js            dashboard aggregations and CSV export

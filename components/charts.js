@@ -3,7 +3,7 @@
 //  - BarChart: ranked horizontal bars, value at each bar tip, tooltip per bar.
 //  - TrendChart: line over time with a crosshair tooltip.
 import { useEffect, useRef, useState } from "react";
-import { useTooltip } from "@/components/providers";
+import { useT, useTooltip } from "@/components/providers";
 import { compact, fmt, localTime } from "@/lib/format";
 
 export function BarChart({ items, label, onSelect, tooltip }) {
@@ -62,6 +62,7 @@ export function TrendChart({ points, label }) {
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState(null);
   const { show, hide } = useTooltip();
+  const { t, lang } = useT();
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -73,7 +74,7 @@ export function TrendChart({ points, label }) {
   }, []);
 
   if (points.length < 2) {
-    return <div className="trend" ref={wrapRef}><div className="empty small">The trend line appears after the second collection.</div></div>;
+    return <div className="trend" ref={wrapRef}><div className="empty small">{t("The trend line appears after the second collection.")}</div></div>;
   }
 
   const W = Math.max(240, Math.round(width || 320));
@@ -83,24 +84,24 @@ export function TrendChart({ points, label }) {
   const ticks = niceTicks(Math.min(...vs), Math.max(...vs), 3);
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
   const t0 = ts[0], t1 = ts[ts.length - 1];
-  const x = (t) => padL + (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0)) * (W - padL - padR);
+  const x = (time) => padL + (t1 === t0 ? 0.5 : (time - t0) / (t1 - t0)) * (W - padL - padR);
   const y = (v) => padT + (1 - (v - y0) / (y1 - y0 || 1)) * (H - padT - padB);
   const d = points.map((p, i) => `${i ? "L" : "M"}${x(ts[i]).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
-  const dateLabel = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const dateLabel = (time) => new Date(time).toLocaleDateString(lang === "ja" ? "ja-JP" : undefined, { month: "short", day: "numeric" });
   const last = points.length - 1;
 
   function onMove(e) {
     const box = e.currentTarget.ownerSVGElement.getBoundingClientRect();
     const px = ((e.clientX - box.left) / box.width) * W;
     let best = 0;
-    ts.forEach((t, i) => { if (Math.abs(x(t) - px) < Math.abs(x(ts[best]) - px)) best = i; });
+    ts.forEach((time, i) => { if (Math.abs(x(time) - px) < Math.abs(x(ts[best]) - px)) best = i; });
     setHover(best);
     show(e, <><div className="tt-title">{localTime(points[best].t)}</div><TooltipRow label={label} value={fmt(vs[best])} keyed /></>);
   }
 
   return (
     <div className="trend" ref={wrapRef}>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${label} over time`}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t("{label} over time", { label })}>
         {ticks.map((tv, i) => (
           <g key={tv}>
             <line className={i === 0 ? "baseline" : "gridline"} x1={padL} x2={W - padR} y1={y(tv)} y2={y(tv)} />
